@@ -1,0 +1,17 @@
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\bin\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.deps.json
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\bin\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.dll
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\bin\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.pdb
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\bin\Debug\net8.0\KnowledgeManagementSystem.Core.dll
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\bin\Debug\net8.0\KnowledgeManagementSystem.Core.pdb
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\obj\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.csproj.AssemblyReference.cache
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\obj\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\obj\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.AssemblyInfoInputs.cache
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\obj\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.AssemblyInfo.cs
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\obj\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.csproj.CoreCompileInputs.cache
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\obj\Debug\net8.0\Knowledg.9B080570.Up2Date
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\obj\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.dll
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\obj\Debug\net8.0\refint\KnowledgeManagementSystem.Infrastructure.dll
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\obj\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.pdb
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\obj\Debug\net8.0\ref\KnowledgeManagementSystem.Infrastructure.dll
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\bin\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.runtimeconfig.json
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Infrastructure\obj\Debug\net8.0\KnowledgeManagementSystem.Infrastructure.genruntimeconfig.cache

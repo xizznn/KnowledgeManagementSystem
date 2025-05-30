@@ -1,0 +1,11 @@
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Core\bin\Debug\net8.0\KnowledgeManagementSystem.Core.deps.json
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Core\bin\Debug\net8.0\KnowledgeManagementSystem.Core.dll
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Core\bin\Debug\net8.0\KnowledgeManagementSystem.Core.pdb
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Core\obj\Debug\net8.0\KnowledgeManagementSystem.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Core\obj\Debug\net8.0\KnowledgeManagementSystem.Core.AssemblyInfoInputs.cache
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Core\obj\Debug\net8.0\KnowledgeManagementSystem.Core.AssemblyInfo.cs
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Core\obj\Debug\net8.0\KnowledgeManagementSystem.Core.csproj.CoreCompileInputs.cache
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Core\obj\Debug\net8.0\KnowledgeManagementSystem.Core.dll
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Core\obj\Debug\net8.0\refint\KnowledgeManagementSystem.Core.dll
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Core\obj\Debug\net8.0\KnowledgeManagementSystem.Core.pdb
+C:\Users\dan9i\source\repos\KnowledgeManagementSystem\KnowledgeManagementSystem.Core\obj\Debug\net8.0\ref\KnowledgeManagementSystem.Core.dll
