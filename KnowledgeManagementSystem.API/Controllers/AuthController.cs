@@ -2,6 +2,8 @@
 using KnowledgeManagementSystem.Core.Interfaces.IServices;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using Swashbuckle.AspNetCore.Annotations;
+using System;
 using System.Threading.Tasks;
 
 namespace KnowledgeManagementSystem.Api.Controllers
@@ -18,6 +20,7 @@ namespace KnowledgeManagementSystem.Api.Controllers
         }
 
         [HttpPost("login")]
+        [SwaggerOperation(Summary = "Вход пользователя")]
         public async Task<IActionResult> Login([FromBody] LoginUserDto loginDto)
         {
             if (!ModelState.IsValid)
@@ -31,6 +34,7 @@ namespace KnowledgeManagementSystem.Api.Controllers
         }
 
         [HttpPost("register")]
+        [SwaggerOperation(Summary = "Регистрация нового пользователя")]
         public async Task<IActionResult> Register([FromBody] RegisterUserDto registerDto)
         {
             if (!ModelState.IsValid)
@@ -44,6 +48,7 @@ namespace KnowledgeManagementSystem.Api.Controllers
         }
 
         [HttpPost("refresh-token")]
+        [SwaggerOperation(Summary = "Обновление JWT токена с использованием refresh-токена")]
         public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto request)
         {
             if (!ModelState.IsValid)

@@ -29,7 +29,7 @@ namespace KnowledgeManagementSystem.API.Controllers
         }
 
         [HttpGet("{id}")]
-        [SwaggerOperation(Summary = "Получить роль по айди")]
+        [SwaggerOperation(Summary = "Получить роль по ID")]
         public async Task<ActionResult<RoleDto>> GetById(int id)
         {
             var dto = await _service.GetRole(id);

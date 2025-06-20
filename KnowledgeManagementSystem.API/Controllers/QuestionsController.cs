@@ -28,7 +28,7 @@ namespace KnowledgeManagementSystem.API.Controllers
         }
 
         [HttpGet("{id}"), AllowAnonymous]
-        [SwaggerOperation(Summary = "Получить вопрос по айди")]
+        [SwaggerOperation(Summary = "Получить вопрос по ID")]
         public async Task<ActionResult<QuestionDto>> GetById(int id)
         {
             var question = await _questionService.GetQuestion(id);
@@ -36,6 +36,7 @@ namespace KnowledgeManagementSystem.API.Controllers
         }
 
         [HttpPost, Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Создать вопрос")]
         public async Task<ActionResult<QuestionDto>> Create([FromBody] CreateQuestionDto dto)
         {
             var newId = await _questionService.AddQuestion(dto);

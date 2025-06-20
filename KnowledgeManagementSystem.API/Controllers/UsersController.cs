@@ -23,6 +23,7 @@ namespace KnowledgeManagementSystem.API.Controllers
         }
 
         [HttpGet("current-profile")]
+        [SwaggerOperation(Summary = "Получить профиль текущего пользователя")]
         public async Task<IActionResult> GetCurrentProfile()
         {
             var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -43,11 +44,13 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpGet]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Получить всех пользователей (только для админов)")]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetAll()
             => Ok(await _userService.GetAllUsers());
 
         [HttpGet("{id}")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Получить пользователя по ID (только для админов)")]
         public async Task<ActionResult<UserDto>> GetById(int id)
         {
             var dto = await _userService.GetUser(id);
@@ -56,6 +59,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpGet("{id}/profile")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Получить профиль пользователя по ID (только для админов)")]
         public async Task<ActionResult<UserProfileDto>> GetProfile(int id)
         {
             var dto = await _userService.GetUserProfile(id);
@@ -64,6 +68,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpPost]
         [AllowAnonymous]
+        [SwaggerOperation(Summary = "Зарегистрировать нового пользователя")]
         public async Task<ActionResult<UserDto>> Create([FromBody] RegisterUserDto dto)
         {
             var newId = await _userService.AddUser(dto);
@@ -73,6 +78,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Обновить данные пользователя (только для админов)")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateUserDto dto)
         {
             if (id != dto.Id && dto.Id != 0)
@@ -87,6 +93,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Удалить пользователя (только для админов)")]
         public async Task<IActionResult> Delete(int id)
         {
             var deleted = await _userService.DeleteUser(id);
@@ -98,6 +105,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpGet("search")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Поиск пользователя по имени и фамилии (только для админов)")]
         public async Task<ActionResult<UserDto>> FindByName([FromQuery] string name, [FromQuery] string surname)
         {
             var dto = await _userService.GetUserByNameAndSurname(name, surname);
@@ -106,11 +114,13 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpGet("by-role/{roleId}")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Получить пользователей по роли (только для админов)")]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetByRole(int roleId)
             => Ok(await _userService.GetUsersByRole(roleId));
 
         [HttpGet("by-birthdate")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Получить пользователей по дате рождения (только для админов)")]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetByBirthDate([FromQuery] DateTime date)
             => Ok(await _userService.GetUsersByBirthDate(date));
     }

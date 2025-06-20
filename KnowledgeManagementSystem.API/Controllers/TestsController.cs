@@ -57,6 +57,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Обновить тест")]
         public async Task<IActionResult> Update(int id, [FromBody] TestDto testDto)
         {
             if (id != testDto.Id)

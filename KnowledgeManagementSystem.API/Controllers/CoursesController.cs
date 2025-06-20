@@ -3,6 +3,8 @@ using KnowledgeManagementSystem.Core.DTOs;
 using KnowledgeManagementSystem.Core.Interfaces.IServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
+using System;
 using System.Threading.Tasks;
 
 namespace KnowledgeManagementSystem.API.Controllers
@@ -22,6 +24,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpGet("{id}")]
         [AllowAnonymous]
+        [SwaggerOperation(Summary = "Получить курс по ID")]
         public async Task<IActionResult> GetById(int id)
         {
             var course = await _courseService.GetCourse(id);
@@ -30,6 +33,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Создать новый курс (только для админов)")]
         public async Task<IActionResult> Create([FromBody] CreateCourseDto createCourseDto)
         {
             var createdCourseId = await _courseService.CreateCourse(createCourseDto);
@@ -37,9 +41,9 @@ namespace KnowledgeManagementSystem.API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = createdCourseId }, createdCourse);
         }
 
-
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Обновить существующий курс по ID (только для админов)")]
         public async Task<IActionResult> Update(int id, [FromBody] CourseDto courseDto)
         {
             if (id != courseDto.Id)
@@ -61,19 +65,18 @@ namespace KnowledgeManagementSystem.API.Controllers
             }
         }
 
-
-
-
-
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Удалить курс по ID (только для админов)")]
         public async Task<IActionResult> Delete(int id)
         {
             var deleted = await _courseService.DeleteCourse(id);
             return deleted ? NoContent() : NotFound();
         }
+
         [HttpGet]
         [AllowAnonymous]
+        [SwaggerOperation(Summary = "Получить список курсов с пагинацией и поиском")]
         public async Task<IActionResult> GetAll(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,

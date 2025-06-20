@@ -2,6 +2,8 @@
 using KnowledgeManagementSystem.Core.Interfaces.IServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
+using System;
 using System.Threading.Tasks;
 
 namespace KnowledgeManagementSystem.API.Controllers
@@ -19,6 +21,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpPost]
         [Authorize]
+        [SwaggerOperation(Summary = "Отправить результаты теста на проверку")]
         public async Task<IActionResult> SubmitResult([FromBody] CreateTestResultDto dto)
         {
             try
@@ -50,6 +53,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpPut("{id}/score")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Обновить оценку за тест (только для админов)")]
         public async Task<IActionResult> UpdateScore(int id, [FromBody] UpdateScoreDto dto)
         {
             if (dto.Score < 0 || dto.Score > 100)
@@ -62,9 +66,9 @@ namespace KnowledgeManagementSystem.API.Controllers
             return NoContent();
         }
 
-
         [HttpGet("user/{userId}")]
         [Authorize]
+        [SwaggerOperation(Summary = "Получить результаты тестов пользователя")]
         public async Task<IActionResult> GetByUser(int userId)
         {
             var results = await _service.GetByUser(userId);
@@ -73,6 +77,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpGet("test/{testId}")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Получить результаты теста (только для админов)")]
         public async Task<IActionResult> GetByTest(int testId)
         {
             var results = await _service.GetByTest(testId);
@@ -81,6 +86,7 @@ namespace KnowledgeManagementSystem.API.Controllers
 
         [HttpGet("pending")]
         [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Получить результаты тестов, ожидающие проверки (только для админов)")]
         public async Task<IActionResult> GetPendingResults()
         {
             var results = await _service.GetPendingResults();
