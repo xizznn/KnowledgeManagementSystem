@@ -1,0 +1,93 @@
+﻿@page
+@{
+    Layout = "_Layout";
+}
+<h2>Тесты</h2>
+
+<input type="text" id="testSearchInput" class="form-control mb-3" placeholder="Поиск тестов..." />
+
+<ul id="testsList" class="list-group"></ul>
+
+<script src="~/js/api.js"></script>
+<script>
+    let allTests = [];
+    let favorites = new Set();
+
+    async function loadFavorites() {
+        const favs = await apiGet('/api/FavoritesTests');
+        if (!favs) return;
+        favorites = new Set(favs.map(f => f.testId || f.id));
+    }
+
+    async function toggleTestFavorite(testId, button) {
+        button.disabled = true;
+        if (favorites.has(testId)) {
+            const success = await apiDelete(`/api/FavoritesTests/${testId}`);
+            if (success) favorites.delete(testId);
+        } else {
+            const success = await apiPost(`/api/FavoritesTests/${testId}`, {});
+            if (success) favorites.add(testId);
+        }
+        renderTests(filteredTests(currentFilter));
+        button.disabled = false;
+    }
+
+    let currentFilter = "";
+
+    function renderTests(tests) {
+        const list = document.getElementById("testsList");
+        list.innerHTML = "";
+
+        if (!tests || tests.length === 0) {
+            list.innerHTML = "<p>Тесты не найдены</p>";
+            return;
+        }
+
+        tests.forEach(test => {
+            const isFav = favorites.has(test.id);
+            const favBtnClass = isFav ? "btn btn-danger" : "btn btn-outline-primary";
+            const favBtnText = isFav ? "Удалить из избранного" : "В избранное";
+
+            const li = document.createElement("li");
+            li.className = "list-group-item d-flex justify-content-between align-items-center";
+
+            li.innerHTML = `
+                <span>${test.title}</span>
+                <div>
+                    <button class="${favBtnClass} btn-sm me-2">${favBtnText}</button>
+                    <a href="/Tests/Details?id=${test.id}" class="btn btn-primary btn-sm">Открыть</a>
+                </div>
+            `;
+
+            const favBtn = li.querySelector("button");
+            favBtn.onclick = () => toggleTestFavorite(test.id, favBtn);
+
+            list.appendChild(li);
+        });
+    }
+
+    function filteredTests(filter) {
+        if (!filter) return allTests;
+        return allTests.filter(t => t.title.toLowerCase().includes(filter.toLowerCase()));
+    }
+
+    async function loadTests() {
+        const result = await apiGet("/api/Tests?pageNumber=1&pageSize=100");
+        if (result && result.data) {
+            allTests = result.data;
+            renderTests(filteredTests(currentFilter));
+        } else {
+            document.getElementById("testsList").innerHTML = "<li class='list-group-item'>Ошибка загрузки тестов или нет доступа</li>";
+        }
+    }
+
+    document.getElementById("testSearchInput").addEventListener("input", (e) => {
+        currentFilter = e.target.value.trim();
+        renderTests(filteredTests(currentFilter));
+    });
+
+    (async () => {
+        await loadFavorites();
+        await loadTests();
+    })();
+</script>

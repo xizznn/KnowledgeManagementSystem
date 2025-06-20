@@ -1,0 +1,223 @@
+﻿@page
+@{
+    Layout = "_Layout";
+}
+
+<h2>Управление вопросами в тестах</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="mb-3">
+            <label class="form-label">Выберите тест</label>
+            <select id="testSelect" class="form-select">
+                <option value="">Загрузка...</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Выберите вопрос</label>
+            <select id="questionSelect" class="form-select">
+                <option value="">Загрузка...</option>
+            </select>
+        </div>
+
+        <button class="btn btn-success" id="addQuestionToTestBtn">Добавить вопрос к тесту</button>
+    </div>
+
+    <div class="col-md-6">
+        <h4>Вопросы в выбранном тесте</h4>
+        <ul id="testQuestionsList" class="list-group mt-2"></ul>
+    </div>
+</div>
+
+<script src="~/js/api.js"></script>
+<script>
+    function parseJwt(token) {
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch (e) {
+            return null;
+        }
+    }
+
+    let currentTestId = null;
+    let allTests = [];
+    let allQuestions = [];
+    let testQuestions = [];
+
+    (async function() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/Login';
+            return;
+        }
+
+        const payload = parseJwt(token);
+        const userId = payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+
+        if (!userId) {
+            alert("Не удалось извлечь ID пользователя из токена");
+            window.location.href = '/Login';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/Users/${userId}/profile`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                alert("Ошибка при проверке прав");
+                window.location.href = '/Login';
+                return;
+            }
+
+            const user = await response.json();
+
+            if (!user.roleTitle || user.roleTitle !== 'Admin') {
+                alert('Недостаточно прав для доступа к этой странице');
+                window.location.href = '/';
+                return;
+            }
+
+            await loadAllTests();
+            await loadAllQuestions();
+
+        } catch (e) {
+            alert('Ошибка при проверке прав доступа');
+            window.location.href = '/Login';
+        }
+    })();
+
+    async function loadAllTests() {
+        try {
+            const response = await apiGet("/api/Tests");
+            allTests = response.data || [];
+
+            const select = document.getElementById("testSelect");
+            select.innerHTML = '<option value="">Выберите тест</option>';
+
+            allTests.forEach(test => {
+                select.innerHTML += `<option value="${test.id}">${test.title}</option>`;
+            });
+
+            select.addEventListener('change', async (e) => {
+                currentTestId = parseInt(e.target.value);
+                if (currentTestId) {
+                    await loadTestQuestions(currentTestId);
+                } else {
+                    document.getElementById("testQuestionsList").innerHTML = '';
+                }
+            });
+
+        } catch (e) {
+            console.error("Ошибка загрузки тестов:", e);
+            document.getElementById("testSelect").innerHTML = '<option value="">Ошибка загрузки</option>';
+        }
+    }
+
+    async function loadAllQuestions() {
+        try {
+            const response = await apiGet("/api/Questions");
+            allQuestions = response || [];
+
+            const select = document.getElementById("questionSelect");
+            select.innerHTML = '<option value="">Выберите вопрос</option>';
+
+            allQuestions.forEach(question => {
+                select.innerHTML += `<option value="${question.id}">${question.title}</option>`;
+            });
+
+        } catch (e) {
+            console.error("Ошибка загрузки вопросов:", e);
+            document.getElementById("questionSelect").innerHTML = '<option value="">Ошибка загрузки</option>';
+        }
+    }
+
+    async function loadTestQuestions(testId) {
+        try {
+            const response = await apiGet(`/api/QuestionsInTests/test/${testId}`);
+            testQuestions = response || [];
+
+            const list = document.getElementById("testQuestionsList");
+            list.innerHTML = '';
+
+            if (testQuestions.length === 0) {
+                list.innerHTML = '<li class="list-group-item">В этом тесте пока нет вопросов</li>';
+                return;
+            }
+
+            // Получаем полный список вопросов для отображения названий
+            const allQuestionsResponse = await apiGet("/api/Questions");
+            const allQuestions = allQuestionsResponse || [];
+
+            list.innerHTML = testQuestions.map(qt => {
+                const fullQuestion = allQuestions.find(q => q.id === qt.questionId) || qt;
+
+                return `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        ${fullQuestion.title || 'Без названия'}
+                        <button class="btn btn-danger btn-sm remove-question-btn"
+                                data-question-id="${qt.questionId}"
+                                data-test-id="${testId}">
+                            Удалить
+                        </button>
+                    </li>`;
+            }).join('');
+
+            document.querySelectorAll('.remove-question-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const questionId = parseInt(btn.dataset.questionId);
+                    const testId = parseInt(btn.dataset.testId);
+                    await removeQuestionFromTest(questionId, testId);
+                });
+            });
+
+        } catch (e) {
+            console.error("Ошибка загрузки вопросов теста:", e);
+            document.getElementById("testQuestionsList").innerHTML =
+                '<li class="list-group-item text-danger">Ошибка загрузки вопросов</li>';
+        }
+    }
+
+    document.getElementById("addQuestionToTestBtn").addEventListener('click', async () => {
+        const testId = parseInt(document.getElementById("testSelect").value);
+        const questionId = parseInt(document.getElementById("questionSelect").value);
+
+        if (!testId || !questionId) {
+            alert("Выберите тест и вопрос");
+            return;
+        }
+
+        try {
+            await apiPost("/api/QuestionsInTests", {
+                testId,
+                questionId
+            });
+
+            alert("Вопрос успешно добавлен к тесту");
+            await loadTestQuestions(testId);
+
+            document.getElementById("questionSelect").value = '';
+
+        } catch (e) {
+            console.error("Ошибка добавления вопроса:", e);
+            alert(`Ошибка: ${e.message}`);
+        }
+    });
+
+    async function removeQuestionFromTest(questionId, testId) {
+        if (!confirm("Удалить этот вопрос из теста?")) return;
+
+        try {
+            await apiDelete(`/api/QuestionsInTests/${questionId}/${testId}`);
+            await loadTestQuestions(testId);
+        } catch (e) {
+            console.error("Ошибка удаления вопроса:", e);
+            alert("Ошибка при удалении вопроса");
+        }
+    }
+</script>

@@ -1,0 +1,128 @@
+﻿@page
+@{
+    Layout = "_Layout";
+}
+
+<h2>Мой профиль</h2>
+
+<h4>Избранные курсы</h4>
+<div id="favoriteCourses" class="row row-cols-1 row-cols-md-2 g-4"></div>
+
+<h4 class="mt-4">Избранные тесты</h4>
+<div id="favoriteTests" class="row row-cols-1 row-cols-md-2 g-4"></div>
+
+<h4 class="mt-4">Мои курсы</h4>
+<div id="myCourses" class="row row-cols-1 row-cols-md-2 g-4"></div>
+
+<h4 class="mt-4">Результаты тестов</h4>
+<table class="table" id="testResultsTable">
+    <thead>
+        <tr><th>Тест</th><th>Оценка</th><th>Дата</th></tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script src="~/js/api.js"></script>
+<script>
+    async function loadProfile() {
+        try {
+            const [courses, tests, user] = await Promise.all([
+                apiGet("/api/FavoritesCourses"),
+                apiGet("/api/FavoritesTests"),
+                apiGet("/api/Users/current-profile")
+            ]);
+
+            const [results, myCourses] = await Promise.all([
+                apiGet(`/api/TestResults/user/${user.id}`),
+                apiGet(`/api/UsersOnCourses/user/${user.id}`)
+            ]);
+
+            renderCourses(courses);
+            renderTests(tests);
+            renderMyCourses(myCourses);
+            renderResults(results);
+        } catch (error) {
+            console.error("Ошибка загрузки данных профиля:", error);
+            alert("Не удалось загрузить данные профиля. Проверь консоль.");
+        }
+    }
+
+    function renderCourses(courses) {
+        const container = document.getElementById("favoriteCourses");
+        container.innerHTML = "";
+        (courses || []).forEach(course => {
+            container.innerHTML += `
+                <div class="col">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>${course.title}</h5>
+                            <a href="/Courses/Details?id=${course.id}" class="btn btn-primary">Открыть</a>
+                        </div>
+                    </div>
+                </div>`;
+        });
+    }
+
+    function renderTests(tests) {
+        const container = document.getElementById("favoriteTests");
+        container.innerHTML = "";
+        (tests || []).forEach(test => {
+            container.innerHTML += `
+                <div class="col">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>${test.title}</h5>
+                            <a href="/Tests/Details?id=${test.id}" class="btn btn-primary">Открыть</a>
+                        </div>
+                    </div>
+                </div>`;
+        });
+    }
+
+    async function renderMyCourses(myCourses) {
+        const container = document.getElementById("myCourses");
+        container.innerHTML = "";
+
+        if (!myCourses || myCourses.length === 0) {
+            container.innerHTML = `<p>Вы ещё не записаны ни на один курс</p>`;
+            return;
+        }
+
+        for (const uc of myCourses) {
+            try {
+                const course = await apiGet(`/api/Courses/${uc.courseId}`);
+                container.innerHTML += `
+                    <div class="col">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5>${course.title}</h5>
+                                <a href="/Courses/Details?id=${course.id}" class="btn btn-primary">Открыть</a>
+                            </div>
+                        </div>
+                    </div>`;
+            } catch {
+                container.innerHTML += `
+                    <div class="col">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5>Курс #${uc.courseId}</h5>
+                                <p>Ошибка загрузки информации</p>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+        }
+    }
+
+    function renderResults(results) {
+        const tbody = document.getElementById("testResultsTable").querySelector("tbody");
+        tbody.innerHTML = "";
+        (results || []).forEach(r => {
+            tbody.innerHTML += `<tr>
+                <td>${r.testTitle}</td><td>${r.score}</td><td>${new Date(r.dateTaken).toLocaleDateString()}</td>
+            </tr>`;
+        });
+    }
+
+    loadProfile();
+</script>

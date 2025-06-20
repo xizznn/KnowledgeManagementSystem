@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace KnowledgeManagement.Infrastructure.Configurations
 {
-    public class TestInCourseConfiguration : IEntityTypeConfiguration<TestInCourse>
+    public class TestInCourseConfiguration : IEntityTypeConfiguration<TestInCourseEntity>
     {
-        public void Configure(EntityTypeBuilder<TestInCourse> builder)
+        public void Configure(EntityTypeBuilder<TestInCourseEntity> builder)
         {
             builder.HasKey(tc => new { tc.CourseId, tc.TestId });
 

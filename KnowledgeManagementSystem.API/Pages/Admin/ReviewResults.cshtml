@@ -1,0 +1,260 @@
+﻿@page
+@{
+    Layout = "_Layout";
+}
+
+<h2>Проверка результатов тестов</h2>
+
+<div class="mb-3">
+    <div class="btn-group" role="group">
+        <button id="showPendingBtn" class="btn btn-primary">Ожидающие проверки</button>
+        <button id="showAllBtn" class="btn btn-outline-primary">Все результаты</button>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-bordered" id="resultsTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Пользователь</th>
+                <th>Тест</th>
+                <th>Оценка</th>
+                <th>Дата прохождения</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script src="~/js/api.js"></script>
+<script>
+    function parseJwt(token) {
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch {
+            return null;
+        }
+    }
+
+    let currentView = 'pending';
+
+    async function checkAdminAccess() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/Login';
+            return false;
+        }
+
+        const payload = parseJwt(token);
+        const userId = payload?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+        if (!userId) {
+            window.location.href = '/Login';
+            return false;
+        }
+
+        try {
+            const response = await fetch(`/api/Users/${userId}/profile`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) {
+                window.location.href = '/Login';
+                return false;
+            }
+            const user = await response.json();
+            if (user.roleTitle !== 'Admin') {
+                alert('Недостаточно прав для доступа к этой странице');
+                window.location.href = '/';
+                return false;
+            }
+            return true;
+        } catch {
+            window.location.href = '/Login';
+            return false;
+        }
+    }
+
+    async function getUserInfo(userId) {
+        try {
+            return await apiGet(`/api/Users/${userId}/profile`);
+        } catch {
+            return { name: '', surname: '', email: '' };
+        }
+    }
+
+    async function getTestInfo(testId) {
+        try {
+            const test = await apiGet(`/api/Tests/${testId}`);
+            return test?.title || `Test ${testId}`;
+        } catch {
+            return `Test ${testId}`;
+        }
+    }
+
+    async function enrichResults(results) {
+        if (!Array.isArray(results)) return [];
+
+        const enriched = [];
+        for (const result of results) {
+            try {
+                const user = await getUserInfo(result.userId);
+                const userFullName = `${user.name || ''} ${user.surname || ''}`.trim() || `User ${result.userId}`;
+                const testTitle = result.testTitle || await getTestInfo(result.testId);
+                enriched.push({ ...result, userFullName, testTitle });
+            } catch {
+                enriched.push(result);
+            }
+        }
+        return enriched;
+    }
+
+    async function loadPendingResults() {
+        const results = await apiGet("/api/TestResults/pending");
+        return await enrichResults(results);
+    }
+
+    async function loadAllResults() {
+        const users = await apiGet("/api/Users");
+        let allResults = [];
+        for (const user of users) {
+            try {
+                const userResults = await apiGet(`/api/TestResults/user/${user.id}`);
+                if (Array.isArray(userResults)) allResults = allResults.concat(userResults);
+            } catch {}
+        }
+        return await enrichResults(allResults);
+    }
+
+    async function loadResults() {
+        if (!await checkAdminAccess()) return;
+
+        try {
+            const results = currentView === 'pending'
+                ? await loadPendingResults()
+                : await loadAllResults();
+            renderResults(results);
+        } catch (error) {
+            renderError(error);
+        }
+    }
+
+    function renderResults(results) {
+        const tbody = document.querySelector("#resultsTable tbody");
+        tbody.innerHTML = "";
+
+        if (!results || results.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center">
+                        ${currentView === 'pending' ? 'Нет результатов, ожидающих проверки' : 'Нет результатов тестов'}
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        results.forEach(r => {
+            const date = new Date(r.dateTaken).toLocaleString();
+            const scoreValue = r.score ?? '';
+            const actionCell = r.score == null
+                ? `<button class="btn btn-sm btn-primary" onclick="updateScore(${r.id})">Сохранить</button>`
+                : '<span class="text-success">Проверено</span>';
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${r.id}</td>
+                    <td>${r.userFullName}</td>
+                    <td>${r.testTitle}</td>
+                    <td>
+                        <input type="number"
+                               class="form-control form-control-sm score-input"
+                               value="${scoreValue}"
+                               min="0" max="100"
+                               data-id="${r.id}"
+                               ${r.score == null ? '' : 'readonly'} />
+                    </td>
+                    <td>${date}</td>
+                    <td>${actionCell}</td>
+                </tr>`;
+        });
+    }
+
+    function renderError(error) {
+        document.querySelector("#resultsTable tbody").innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-danger">
+                    ${currentView === 'pending' ? 'Ошибка загрузки ожидающих результатов' : 'Ошибка загрузки всех результатов'}
+                    <br>${error.message || 'Неизвестная ошибка'}
+                </td>
+            </tr>`;
+    }
+
+    async function updateScore(id) {
+        const input = document.querySelector(`.score-input[data-id='${id}']`);
+        if (!input) {
+            alert("Элемент для ввода оценки не найден");
+            return;
+        }
+
+        const score = input.value ? parseInt(input.value) : null;
+        if (score === null || isNaN(score) || score < 0 || score > 100) {
+            alert("Оценка должна быть числом от 0 до 100");
+            return;
+        }
+
+        try {
+            await apiPut(`/api/TestResults/${id}/score`, { score });
+            alert("Оценка успешно обновлена");
+            await loadResults();
+        } catch (error) {
+            alert(`Ошибка: ${error.message}`);
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("showPendingBtn").addEventListener("click", () => {
+            currentView = 'pending';
+            document.getElementById("showPendingBtn").className = "btn btn-primary";
+            document.getElementById("showAllBtn").className = "btn btn-outline-primary";
+            loadResults();
+        });
+
+        document.getElementById("showAllBtn").addEventListener("click", () => {
+            currentView = 'all';
+            document.getElementById("showPendingBtn").className = "btn btn-outline-primary";
+            document.getElementById("showAllBtn").className = "btn btn-primary";
+            loadResults();
+        });
+
+        loadResults();
+    });
+</script>
+
+<style>
+    #resultsTable {
+        width: 100%;
+    }
+
+        #resultsTable th {
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+        }
+
+    .table-responsive {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+
+    .btn-group {
+        margin-bottom: 20px;
+    }
+
+    .score-input {
+        width: 80px;
+    }
+
+        .score-input:read-only {
+            background-color: #f8f9fa;
+        }
+</style>

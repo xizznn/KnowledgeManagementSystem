@@ -1,0 +1,201 @@
+﻿@page
+@{
+    Layout = "_Layout";
+}
+
+<h2>Управление курсами</h2>
+
+<div class="mb-3">
+    <input type="text" id="courseTitle" placeholder="Название курса" class="form-control" />
+    <input type="text" id="courseUserAuthor" placeholder="Автор курса" class="form-control mt-2" />
+    <textarea id="courseDescription" placeholder="Описание курса" class="form-control mt-2"></textarea>
+    <button class="btn btn-success mt-2" id="addCourseBtn">Добавить курс</button>
+    <button class="btn btn-secondary mt-2 d-none" id="cancelEditBtn">Отмена</button>
+</div>
+
+<ul id="coursesList" class="list-group mt-4"></ul>
+
+<script src="~/js/api.js"></script>
+<script>
+    function parseJwt(token) {
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch (e) {
+            return null;
+        }
+    }
+
+    (async function() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/Login';  // Редирект без параметров
+            return;
+        }
+
+        const payload = parseJwt(token);
+        const userId = payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+
+        if (!userId) {
+            alert("Не удалось извлечь ID пользователя из токена");
+            window.location.href = '/Login';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/Users/${userId}/profile`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                alert("Ошибка при проверке прав");
+                window.location.href = '/Login';
+                return;
+            }
+
+            const user = await response.json();
+
+            if (!user.roleTitle || user.roleTitle !== 'Admin') {
+                alert('Недостаточно прав для доступа к этой странице');
+                window.location.href = '/';
+                return;
+            }
+
+            loadCourses();
+
+        } catch (e) {
+            alert('Ошибка при проверке прав доступа');
+            window.location.href = '/Login';
+        }
+    })();
+
+    let editCourseId = null;
+    let currentCourses = [];
+
+    async function loadCourses() {
+        try {
+            const response = await apiGet("/api/Courses");
+            currentCourses = response.data || [];
+
+            const list = document.getElementById("coursesList");
+            list.innerHTML = "";
+
+            if (currentCourses.length === 0) {
+                list.innerHTML = '<li class="list-group-item">Курсы не найдены</li>';
+                return;
+            }
+
+            currentCourses.forEach(c => {
+                list.innerHTML += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center" data-course-id="${c.id}">
+                        <div>
+                            <strong>${c.title}</strong><br/>
+                            Автор: ${c.userAuthor}<br/>
+                            ${c.description ? c.description : ""}<br/>
+                            <small>Добавлен: ${new Date(c.addedAt).toLocaleDateString()}</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-primary btn-sm me-2 edit-btn" data-course-id="${c.id}">Редактировать</button>
+                            <button class="btn btn-danger btn-sm delete-btn" data-course-id="${c.id}">Удалить</button>
+                        </div>
+                    </li>`;
+            });
+
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const courseId = parseInt(btn.dataset.courseId);
+                    const course = currentCourses.find(c => c.id === courseId);
+                    if (course) openEditForm(course);
+                });
+            });
+
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const courseId = parseInt(btn.dataset.courseId);
+                    deleteCourse(courseId);
+                });
+            });
+
+        } catch (e) {
+            console.error("Ошибка загрузки курсов:", e);
+            document.getElementById("coursesList").innerHTML =
+                '<li class="list-group-item text-danger">Ошибка загрузки курсов</li>';
+        }
+    }
+
+    async function deleteCourse(id) {
+        if (confirm("Удалить курс?")) {
+            try {
+                await apiDelete(`/api/Courses/${id}`);
+                loadCourses();
+            } catch (e) {
+                alert("Ошибка при удалении курса");
+                console.error(e);
+            }
+        }
+    }
+
+    function openEditForm(course) {
+        editCourseId = course.id;
+        document.getElementById("courseTitle").value = course.title;
+        document.getElementById("courseUserAuthor").value = course.userAuthor;
+        document.getElementById("courseDescription").value = course.description || "";
+
+        document.getElementById("courseTitle").scrollIntoView({ behavior: 'smooth' });
+
+        document.getElementById("addCourseBtn").textContent = "Сохранить изменения";
+        document.getElementById("addCourseBtn").classList.remove("btn-success");
+        document.getElementById("addCourseBtn").classList.add("btn-primary");
+        document.getElementById("cancelEditBtn").classList.remove("d-none");
+    }
+
+    function resetForm() {
+        editCourseId = null;
+        document.getElementById("courseTitle").value = "";
+        document.getElementById("courseUserAuthor").value = "";
+        document.getElementById("courseDescription").value = "";
+
+        document.getElementById("addCourseBtn").textContent = "Добавить курс";
+        document.getElementById("addCourseBtn").classList.remove("btn-primary");
+        document.getElementById("addCourseBtn").classList.add("btn-success");
+        document.getElementById("cancelEditBtn").classList.add("d-none");
+    }
+
+    document.getElementById("cancelEditBtn").addEventListener("click", resetForm);
+
+    document.getElementById("addCourseBtn").addEventListener("click", async () => {
+        const title = document.getElementById("courseTitle").value.trim();
+        const userAuthor = document.getElementById("courseUserAuthor").value.trim();
+        const description = document.getElementById("courseDescription").value.trim();
+
+        if (!title || !userAuthor) {
+            alert("Введите название курса и автора");
+            return;
+        }
+
+        try {
+            const payload = {
+                id: editCourseId,
+                title,
+                userAuthor,
+                description: description || null
+            };
+
+            if (editCourseId) {
+                await apiPut(`/api/Courses/${editCourseId}`, payload);
+                alert("Курс успешно обновлен");
+            } else {
+                await apiPost("/api/Courses", payload);
+                alert("Курс успешно добавлен");
+            }
+
+            resetForm();
+            await loadCourses();
+        } catch (e) {
+            console.error("Полная ошибка:", e);
+            alert(`Ошибка сохранения: ${e.message}`);
+        }
+    });
+</script>

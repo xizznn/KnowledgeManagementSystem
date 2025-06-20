@@ -1,0 +1,200 @@
+﻿@page
+@{
+    Layout = "_Layout";
+}
+
+<h2>Управление вопросами</h2>
+
+<div class="mb-3">
+    <input type="text" id="questionTitle" placeholder="Название вопроса" class="form-control" />
+    <textarea id="questionText" placeholder="Текст вопроса" class="form-control mt-2"></textarea>
+    <textarea id="questionAnswer" placeholder="Ответ на вопрос" class="form-control mt-2"></textarea>
+    <button class="btn btn-success mt-2" id="addQuestionBtn">Добавить вопрос</button>
+    <button class="btn btn-secondary mt-2 d-none" id="cancelEditBtn">Отмена</button>
+</div>
+
+<ul id="questionsList" class="list-group mt-4"></ul>
+
+<script src="~/js/api.js"></script>
+<script>
+    function parseJwt(token) {
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch (e) {
+            return null;
+        }
+    }
+
+    let editQuestionId = null;
+    let currentQuestions = [];
+
+    (async function() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/Login';
+            return;
+        }
+
+        const payload = parseJwt(token);
+        const userId = payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+
+        if (!userId) {
+            alert("Не удалось извлечь ID пользователя из токена");
+            window.location.href = '/Login';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/Users/${userId}/profile`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                alert("Ошибка при проверке прав");
+                window.location.href = '/Login';
+                return;
+            }
+
+            const user = await response.json();
+
+            if (!user.roleTitle || user.roleTitle !== 'Admin') {
+                alert('Недостаточно прав для доступа к этой странице');
+                window.location.href = '/';
+                return;
+            }
+
+            await loadQuestions();
+
+        } catch (e) {
+            alert('Ошибка при проверке прав доступа');
+            window.location.href = '/Login';
+        }
+    })();
+
+    async function loadQuestions() {
+        try {
+            const response = await apiGet("/api/Questions");
+            currentQuestions = response || [];
+            renderQuestions();
+        } catch (e) {
+            console.error("Ошибка загрузки вопросов:", e);
+            document.getElementById("questionsList").innerHTML =
+                '<li class="list-group-item text-danger">Ошибка загрузки вопросов</li>';
+        }
+    }
+
+    function renderQuestions() {
+        const list = document.getElementById("questionsList");
+        list.innerHTML = "";
+
+        if (currentQuestions.length === 0) {
+            list.innerHTML = "<li class='list-group-item'>Вопросы не найдены</li>";
+            return;
+        }
+
+        currentQuestions.forEach(q => {
+            list.innerHTML += `
+                <li class="list-group-item d-flex justify-content-between align-items-center" data-question-id="${q.id}">
+                    <div>
+                        <strong>${q.title}</strong><br/>
+                        <small>${q.text}</small><br/>
+                        <small class="text-muted">Ответ: ${q.answer}</small>
+                    </div>
+                    <div>
+                        <button class="btn btn-primary btn-sm me-2 edit-btn" data-question-id="${q.id}">Редактировать</button>
+                        <button class="btn btn-danger btn-sm delete-btn" data-question-id="${q.id}">Удалить</button>
+                    </div>
+                </li>`;
+        });
+
+        document.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = parseInt(btn.dataset.questionId);
+                const question = currentQuestions.find(q => q.id === id);
+                if (question) openEditForm(question);
+            });
+        });
+
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = parseInt(btn.dataset.questionId);
+                deleteQuestion(id);
+            });
+        });
+    }
+
+    function openEditForm(question) {
+        editQuestionId = question.id;
+        document.getElementById("questionTitle").value = question.title;
+        document.getElementById("questionText").value = question.text || "";
+        document.getElementById("questionAnswer").value = question.answer || "";
+
+        document.getElementById("addQuestionBtn").textContent = "Сохранить изменения";
+        document.getElementById("addQuestionBtn").classList.remove("btn-success");
+        document.getElementById("addQuestionBtn").classList.add("btn-primary");
+        document.getElementById("cancelEditBtn").classList.remove("d-none");
+    }
+
+    function resetForm() {
+        editQuestionId = null;
+        document.getElementById("questionTitle").value = "";
+        document.getElementById("questionText").value = "";
+        document.getElementById("questionAnswer").value = "";
+
+        document.getElementById("addQuestionBtn").textContent = "Добавить вопрос";
+        document.getElementById("addQuestionBtn").classList.remove("btn-primary");
+        document.getElementById("addQuestionBtn").classList.add("btn-success");
+        document.getElementById("cancelEditBtn").classList.add("d-none");
+    }
+
+    document.getElementById("cancelEditBtn").addEventListener("click", resetForm);
+
+    document.getElementById("addQuestionBtn").addEventListener("click", async () => {
+        const title = document.getElementById("questionTitle").value.trim();
+        const text = document.getElementById("questionText").value.trim();
+        const answer = document.getElementById("questionAnswer").value.trim();
+
+        if (!title || !answer) {
+            alert("Заполните название вопроса и ответ");
+            return;
+        }
+
+        try {
+            const payload = {
+                id: editQuestionId,
+                title: title,
+                text: text || null,
+                answer: answer
+            };
+
+            if (editQuestionId) {
+                await apiPut(`/api/Questions/${editQuestionId}`, payload);
+                alert("Вопрос успешно обновлен");
+            } else {
+                await apiPost("/api/Questions", payload);
+                alert("Вопрос успешно добавлен");
+            }
+
+            resetForm();
+            await loadQuestions();
+        } catch (e) {
+            console.error("Ошибка сохранения вопроса:", e);
+            alert("Ошибка при сохранении вопроса");
+        }
+    });
+
+    async function deleteQuestion(id) {
+        if (confirm("Удалить вопрос?")) {
+            try {
+                await apiDelete(`/api/Questions/${id}`);
+                await loadQuestions();
+            } catch (e) {
+                alert("Ошибка при удалении вопроса");
+                console.error(e);
+            }
+        }
+    }
+</script>

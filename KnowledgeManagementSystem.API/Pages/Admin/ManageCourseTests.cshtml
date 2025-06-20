@@ -1,0 +1,221 @@
+﻿@page
+@{
+    Layout = "_Layout";
+}
+
+<h2>Управление тестами в курсах</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="mb-3">
+            <label class="form-label">Выберите курс</label>
+            <select id="courseSelect" class="form-select">
+                <option value="">Загрузка...</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Выберите тест</label>
+            <select id="testSelect" class="form-select">
+                <option value="">Загрузка...</option>
+            </select>
+        </div>
+
+        <button class="btn btn-success" id="addTestToCourseBtn">Добавить тест к курсу</button>
+    </div>
+
+    <div class="col-md-6">
+        <h4>Тесты в выбранном курсе</h4>
+        <ul id="courseTestsList" class="list-group mt-2"></ul>
+    </div>
+</div>
+
+<script src="~/js/api.js"></script>
+<script>
+    function parseJwt(token) {
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch (e) {
+            return null;
+        }
+    }
+
+    let currentCourseId = null;
+    let allCourses = [];
+    let allTests = [];
+    let courseTests = [];
+
+    (async function() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/Login';
+            return;
+        }
+
+        const payload = parseJwt(token);
+        const userId = payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+
+        if (!userId) {
+            alert("Не удалось извлечь ID пользователя из токена");
+            window.location.href = '/Login';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/Users/${userId}/profile`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                alert("Ошибка при проверке прав");
+                window.location.href = '/Login';
+                return;
+            }
+
+            const user = await response.json();
+
+            if (!user.roleTitle || user.roleTitle !== 'Admin') {
+                alert('Недостаточно прав для доступа к этой странице');
+                window.location.href = '/';
+                return;
+            }
+
+            await loadAllCourses();
+            await loadAllTests();
+
+        } catch (e) {
+            alert('Ошибка при проверке прав доступа');
+            window.location.href = '/Login';
+        }
+    })();
+
+    async function loadAllCourses() {
+        try {
+            const response = await apiGet("/api/Courses");
+            allCourses = response.data || [];
+
+            const select = document.getElementById("courseSelect");
+            select.innerHTML = '<option value="">Выберите курс</option>';
+
+            allCourses.forEach(course => {
+                select.innerHTML += `<option value="${course.id}">${course.title}</option>`;
+            });
+
+            select.addEventListener('change', async (e) => {
+                currentCourseId = parseInt(e.target.value);
+                if (currentCourseId) {
+                    await loadCourseTests(currentCourseId);
+                } else {
+                    document.getElementById("courseTestsList").innerHTML = '';
+                }
+            });
+
+        } catch (e) {
+            console.error("Ошибка загрузки курсов:", e);
+            document.getElementById("courseSelect").innerHTML = '<option value="">Ошибка загрузки</option>';
+        }
+    }
+
+    async function loadAllTests() {
+        try {
+            const response = await apiGet("/api/Tests");
+            allTests = response.data || [];
+
+            const select = document.getElementById("testSelect");
+            select.innerHTML = '<option value="">Выберите тест</option>';
+
+            allTests.forEach(test => {
+                select.innerHTML += `<option value="${test.id}">${test.title}</option>`;
+            });
+
+        } catch (e) {
+            console.error("Ошибка загрузки тестов:", e);
+            document.getElementById("testSelect").innerHTML = '<option value="">Ошибка загрузки</option>';
+        }
+    }
+
+    async function loadCourseTests(courseId) {
+        try {
+            const response = await apiGet(`/api/TestsInCourses/course/${courseId}`);
+            courseTests = response || [];
+
+            const list = document.getElementById("courseTestsList");
+            list.innerHTML = '';
+
+            if (!courseTests || courseTests.length === 0) {
+                list.innerHTML = '<li class="list-group-item">В этом курсе пока нет тестов</li>';
+                return;
+            }
+
+            // Получаем полный список тестов для отображения названий
+            const allTestsResponse = await apiGet("/api/Tests");
+            const allTests = allTestsResponse.data || [];
+
+            list.innerHTML = courseTests.map(tc => {
+                const fullTest = allTests.find(t => t.id === tc.testId) || tc;
+
+                return `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        ${fullTest.title || 'Тест без названия'}
+                        <button class="btn btn-danger btn-sm remove-test-btn"
+                                data-test-id="${tc.testId}">
+                            Удалить
+                        </button>
+                    </li>`;
+            }).join('');
+
+            document.querySelectorAll('.remove-test-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const testId = parseInt(btn.dataset.testId);
+                    await removeTestFromCourse(testId);
+                });
+            });
+
+        } catch (e) {
+            console.error("Ошибка загрузки тестов курса:", e);
+            document.getElementById("courseTestsList").innerHTML =
+                '<li class="list-group-item text-danger">Ошибка загрузки тестов</li>';
+        }
+    }
+
+    document.getElementById("addTestToCourseBtn").addEventListener('click', async () => {
+        const courseId = parseInt(document.getElementById("courseSelect").value);
+        const testId = parseInt(document.getElementById("testSelect").value);
+
+        if (!courseId || !testId) {
+            alert("Выберите курс и тест");
+            return;
+        }
+
+        try {
+            await apiPost("/api/TestsInCourses", {
+                courseId,
+                testId
+            });
+
+            alert("Тест успешно добавлен к курсу");
+            await loadCourseTests(courseId);
+
+            document.getElementById("testSelect").value = '';
+
+        } catch (e) {
+            console.error("Ошибка добавления теста:", e);
+            alert(`Ошибка: ${e.message}`);
+        }
+    });
+
+    async function removeTestFromCourse(testId) {
+        if (!confirm("Удалить этот тест из курса?")) return;
+
+        try {
+            await apiDelete(`/api/TestsInCourses/${currentCourseId}/${testId}`);
+            await loadCourseTests(currentCourseId);
+        } catch (e) {
+            console.error("Ошибка удаления теста:", e);
+            alert("Ошибка при удалении теста");
+        }
+    }
+</script>

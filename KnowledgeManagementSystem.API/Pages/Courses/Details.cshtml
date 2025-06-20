@@ -1,0 +1,187 @@
+﻿@page
+@{
+    Layout = "_Layout";
+    var courseId = Request.Query["id"];
+}
+
+<h2>Детали курса</h2>
+<div id="courseDetails"></div>
+
+<div class="mt-3">
+    <button id="favBtn" class="btn btn-outline-warning">Загрузка...</button>
+    <button id="enrollBtn" class="btn btn-outline-success ms-2">Проверка...</button>
+</div>
+
+<hr />
+<h4>Тесты по этому курсу</h4>
+<ul id="testsList" class="list-group">
+    <li class="list-group-item">Загрузка тестов...</li>
+</ul>
+
+<script src="~/js/api.js"></script>
+<script>
+    const courseId = "@courseId";
+
+    async function isCourseFavorite(id) {
+        return await apiGet(`/api/FavoritesCourses/check/${id}`);
+    }
+
+    async function addCourseToFavorites(id) {
+        return await apiPost(`/api/FavoritesCourses/${id}`, {});
+    }
+
+    async function removeCourseFromFavorites(id) {
+        return await apiDelete(`/api/FavoritesCourses/${id}`);
+    }
+
+    async function updateFavButton() {
+        const btn = document.getElementById("favBtn");
+        try {
+            const isFav = await isCourseFavorite(courseId);
+            btn.textContent = isFav ? "Удалить из избранного" : "Добавить в избранное";
+            btn.className = isFav ? "btn btn-warning" : "btn btn-outline-warning";
+        } catch (e) {
+            console.error("Ошибка updateFavButton:", e);
+            btn.textContent = "Ошибка";
+            btn.disabled = true;
+        }
+    }
+
+    async function checkEnrollment(courseId) {
+        const user = await apiGet("/api/Users/current-profile");
+        const enrolledCourses = await apiGet(`/api/UsersOnCourses/user/${user.id}`);
+        return enrolledCourses.some(c => c.courseId === parseInt(courseId));
+    }
+
+    async function enrollInCourse(courseId) {
+        const user = await apiGet("/api/Users/current-profile");
+        return await apiPost("/api/UsersOnCourses", {
+            userId: user.id,
+            courseId: parseInt(courseId)
+        });
+    }
+
+    async function updateEnrollButton() {
+        const btn = document.getElementById("enrollBtn");
+        try {
+            const isEnrolled = await checkEnrollment(courseId);
+
+            if (isEnrolled) {
+                btn.textContent = "Вы уже записаны на курс";
+                btn.className = "btn btn-success";
+                btn.disabled = true;
+                btn.onclick = null;
+            } else {
+                btn.textContent = "Записаться на курс";
+                btn.className = "btn btn-outline-success";
+                btn.disabled = false;
+                btn.onclick = async () => {
+                    try {
+                        await enrollInCourse(courseId);
+                        alert("Вы успешно записались на курс!");
+                        await updateEnrollButton();
+                    } catch (err) {
+                        console.error("Ошибка при записи на курс:", err);
+                        alert("Ошибка при записи на курс.");
+                    }
+                };
+            }
+        } catch (err) {
+            console.error("Ошибка при проверке записи на курс:", err);
+            btn.textContent = "Ошибка загрузки статуса";
+            btn.disabled = true;
+        }
+    }
+
+    async function loadCourse() {
+        const course = await apiGet(`/api/Courses/${courseId}`);
+        if (!course) {
+            throw new Error("Курс не найден или нет доступа");
+        }
+        document.getElementById("courseDetails").innerHTML = `
+            <h3>${course.title}</h3>
+            <p><strong>Автор:</strong> ${course.userAuthor || "неизвестен"}</p>
+            <p>${course.description || ""}</p>
+        `;
+    }
+
+    async function loadTests() {
+        try {
+            const testsInCourse = await apiGet(`/api/TestsInCourses/course/${courseId}`);
+            const allTestsRaw = await apiGet("/api/Tests?pageNumber=1&pageSize=100");
+            const allTests = Array.isArray(allTestsRaw) ? allTestsRaw : allTestsRaw.data || [];
+
+            const list = document.getElementById("testsList");
+            if (!testsInCourse || testsInCourse.length === 0) {
+                list.innerHTML = '<li class="list-group-item">Тестов для этого курса пока нет</li>';
+                return;
+            }
+
+            list.innerHTML = testsInCourse.map(tc => {
+                const fullTest = allTests.find(t => t.id === tc.testId) || tc;
+                return `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${fullTest.title || 'Без названия'}</strong>
+                            ${fullTest.description ? `<p class="mb-0 small">${fullTest.description}</p>` : ''}
+                        </div>
+                        <a href="/Tests/Details?id=${tc.testId || tc.id}" class="btn btn-sm btn-primary">Пройти тест</a>
+                    </li>
+                `;
+            }).join("");
+        } catch (error) {
+            console.error("Ошибка загрузки тестов:", error);
+            document.getElementById("testsList").innerHTML =
+                '<li class="list-group-item text-danger">Ошибка загрузки тестов</li>';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        try {
+            await loadCourse();
+        } catch (e) {
+            console.error("Ошибка loadCourse:", e);
+            alert("Ошибка загрузки курса. Попробуйте обновить страницу.");
+            return;
+        }
+
+        try {
+            await loadTests();
+        } catch (e) {
+            console.error("Ошибка loadTests:", e);
+            alert("Ошибка загрузки тестов. Попробуйте обновить страницу.");
+            return;
+        }
+
+        try {
+            await updateFavButton();
+        } catch (e) {
+            console.error("Ошибка updateFavButton:", e);
+            alert("Ошибка обновления кнопки избранного");
+            return;
+        }
+
+        try {
+            await updateEnrollButton();
+        } catch (e) {
+            console.error("Ошибка updateEnrollButton:", e);
+            alert("Ошибка обновления кнопки записи на курс");
+            return;
+        }
+    });
+
+    document.getElementById("favBtn").addEventListener("click", async () => {
+        try {
+            const isFav = await isCourseFavorite(courseId);
+            if (isFav) {
+                await removeCourseFromFavorites(courseId);
+            } else {
+                await addCourseToFavorites(courseId);
+            }
+            await updateFavButton();
+        } catch (e) {
+            console.error("Ошибка при изменении избранного:", e);
+            alert("Ошибка при изменении избранного");
+        }
+    });
+</script>

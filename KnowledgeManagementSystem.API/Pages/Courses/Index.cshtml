@@ -1,0 +1,100 @@
+﻿@page
+@{
+    Layout = "_Layout";
+}
+
+<h2>Курсы</h2>
+
+<div class="mb-3">
+    <input type="text" id="searchInput" class="form-control" placeholder="Поиск курсов..." />
+</div>
+
+<div id="coursesList" class="row row-cols-1 row-cols-md-2 g-4"></div>
+
+<script src="~/js/api.js"></script>
+<script>
+    let favorites = new Set();
+    let allCourses = [];
+
+    async function loadFavorites() {
+        const favs = await apiGet('/api/FavoritesCourses');
+        if (!favs) return;
+        favorites = new Set(favs.map(f => f.courseId || f.id));
+    }
+
+    function renderCourses(courses) {
+        const list = document.getElementById("coursesList");
+        list.innerHTML = "";
+
+        if (!courses || courses.length === 0) {
+            list.innerHTML = "<p>Курсы не найдены</p>";
+            return;
+        }
+
+        courses.forEach(course => {
+            const isFav = favorites.has(course.id);
+            list.innerHTML += `
+                <div class="col">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">${course.title}</h5>
+                            <p>${course.description || ''}</p>
+                            <a href="/Courses/Details?id=${course.id}" class="btn btn-primary btn-sm me-2">Открыть</a>
+                            <button class="btn btn-${isFav ? 'danger' : 'outline-primary'} btn-sm favorite-btn" data-id="${course.id}">
+                                ${isFav ? 'Удалить из избранного' : 'Добавить в избранное'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        document.querySelectorAll('.favorite-btn').forEach(btn => {
+            btn.onclick = async () => {
+                const courseId = btn.getAttribute('data-id');
+                if (favorites.has(+courseId)) {
+                    const success = await apiDelete(`/api/FavoritesCourses/${courseId}`);
+                    if (success) {
+                        favorites.delete(+courseId);
+                        btn.classList.remove('btn-danger');
+                        btn.classList.add('btn-outline-primary');
+                        btn.textContent = 'Добавить в избранное';
+                    }
+                } else {
+                    const success = await apiPost(`/api/FavoritesCourses/${courseId}`, {});
+                    if (success) {
+                        favorites.add(+courseId);
+                        btn.classList.remove('btn-outline-primary');
+                        btn.classList.add('btn-danger');
+                        btn.textContent = 'Удалить из избранного';
+                    }
+                }
+            };
+        });
+    }
+
+    async function loadCourses() {
+        const result = await apiGet('/api/Courses?pageNumber=1&pageSize=100');
+        if (result && result.data) {
+            allCourses = result.data;
+            renderCourses(allCourses);
+        } else {
+            document.getElementById("coursesList").innerHTML = "<p>Ошибка загрузки курсов или нет доступа</p>";
+        }
+    }
+
+    document.getElementById("searchInput").addEventListener("input", (e) => {
+        const val = e.target.value.trim().toLowerCase();
+        const filtered = allCourses.filter(c => c.title.toLowerCase().includes(val));
+        renderCourses(filtered);
+    });
+
+    (async () => {
+        if (!localStorage.getItem("token")) {
+            document.getElementById("coursesList").innerHTML = "<p>Пожалуйста, войдите, чтобы просматривать курсы и добавлять в избранное.</p>";
+            return;
+        }
+        await loadFavorites();
+        await loadCourses();
+    })();
+</script>

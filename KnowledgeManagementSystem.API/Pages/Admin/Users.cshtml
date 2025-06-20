@@ -1,0 +1,157 @@
+﻿@page
+@{
+    Layout = "_Layout";
+}
+
+<h2>Пользователи</h2>
+
+<div class="mb-3">
+    <input type="text" id="name" placeholder="Имя" class="form-control" />
+    <input type="text" id="surname" placeholder="Фамилия" class="form-control mt-2" />
+    <input type="email" id="email" placeholder="Email" class="form-control mt-2" />
+    <input type="date" id="dateOfBirth" placeholder="Дата рождения" class="form-control mt-2" />
+    <input type="password" id="password" placeholder="Пароль" class="form-control mt-2" />
+    <select id="roleId" class="form-select mt-2">
+        <option value="2" selected>Пользователь</option>
+        <option value="1">Админ</option>
+    </select>
+    <button class="btn btn-success mt-2" id="addUserBtn">Добавить пользователя</button>
+</div>
+
+<ul id="usersList" class="list-group mt-4"></ul>
+
+<script src="~/js/api.js"></script>
+<script>
+    function parseJwt(token) {
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch {
+            return null;
+        }
+    }
+
+    (async function() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/Login';
+            return;
+        }
+
+        const payload = parseJwt(token);
+        const userId = payload?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+        if (!userId) {
+            alert("Не удалось извлечь ID пользователя из токена");
+            window.location.href = '/Login';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/Users/${userId}/profile`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (!response.ok) {
+                alert("Ошибка при проверке прав");
+                window.location.href = '/Login';
+                return;
+            }
+            const user = await response.json();
+            if (user.roleTitle !== 'Admin') {
+                alert('Недостаточно прав для доступа к этой странице');
+                window.location.href = '/';
+                return;
+            }
+        } catch {
+            alert('Ошибка при проверке прав доступа');
+            window.location.href = '/Login';
+        }
+    })();
+
+    const loadUsers = async () => {
+        const users = await apiGet("/api/Users");
+        const list = document.getElementById("usersList");
+        list.innerHTML = "";
+        for (let user of users) {
+            const roleName = user.roleId == 1 ? "Admin" : "User";
+            const date = new Date(user.dateOfBirth).toLocaleDateString();
+
+            list.innerHTML += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${user.name} ${user.surname}</strong><br />
+                        Email: ${user.email}<br />
+                        Дата рождения: ${date}<br />
+                        Роль: ${roleName}
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="setRole(${user.id}, 1)">Admin</button>
+                        <button class="btn btn-sm btn-outline-secondary me-1" onclick="setRole(${user.id}, 2)">User</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${user.id})">Удалить</button>
+                    </div>
+                </li>`;
+        }
+    };
+
+    document.getElementById("addUserBtn").addEventListener("click", async () => {
+        const user = {
+            name: document.getElementById("name").value.trim(),
+            surname: document.getElementById("surname").value.trim(),
+            email: document.getElementById("email").value.trim(),
+            password: document.getElementById("password").value,
+            dateOfBirth: new Date(document.getElementById("dateOfBirth").value).toISOString(),
+            roleId: parseInt(document.getElementById("roleId").value)
+        };
+
+        if (!user.name || !user.surname || !user.email || !user.password || !user.dateOfBirth) {
+            alert("Заполните все поля");
+            return;
+        }
+
+        try {
+            await apiPost("/api/Users", user);
+            alert("Пользователь добавлен");
+            loadUsers();
+
+            document.getElementById("name").value = "";
+            document.getElementById("surname").value = "";
+            document.getElementById("email").value = "";
+            document.getElementById("password").value = "";
+            document.getElementById("dateOfBirth").value = "";
+            document.getElementById("roleId").value = "2";
+        } catch (e) {
+            alert("Ошибка при добавлении пользователя");
+        }
+    });
+
+    const setRole = async (id, roleId) => {
+        const user = await apiGet(`/api/Users/${id}`);
+        if (!user) {
+            alert("Пользователь не найден");
+            return;
+        }
+
+        user.roleId = roleId;
+
+        await fetch(`/api/Users/${id}`, {
+            method: "PUT",
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem("token")}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(user)
+        });
+
+        await loadUsers();
+    };
+
+    const deleteUser = async (id) => {
+        if (confirm("Удалить пользователя?")) {
+            await apiDelete(`/api/Users/${id}`);
+            loadUsers();
+        }
+    };
+
+    loadUsers();
+</script>

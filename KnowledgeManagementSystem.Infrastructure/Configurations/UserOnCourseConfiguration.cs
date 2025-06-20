@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace KnowledgeManagement.Infrastructure.Configurations
 {
-    public class UserOnCourseConfiguration : IEntityTypeConfiguration<UserOnCourse>
+    public class UserOnCourseConfiguration : IEntityTypeConfiguration<UserOnCourseEntity>
     {
-        public void Configure(EntityTypeBuilder<UserOnCourse> builder)
+        public void Configure(EntityTypeBuilder<UserOnCourseEntity> builder)
         {
             builder.HasKey(uc => new { uc.UserId, uc.CourseId });
 

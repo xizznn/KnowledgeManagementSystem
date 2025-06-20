@@ -1,0 +1,194 @@
+﻿@page
+@{
+    Layout = "_Layout";
+}
+
+<h2>Управление тестами</h2>
+
+<div class="mb-3">
+    <input type="text" id="testTitle" placeholder="Название теста" class="form-control" />
+    <textarea id="testDescription" placeholder="Описание теста" class="form-control mt-2"></textarea>
+    <button class="btn btn-success mt-2" id="addTestBtn">Добавить тест</button>
+    <button class="btn btn-secondary mt-2 d-none" id="cancelEditBtn">Отмена</button>
+</div>
+
+<ul id="testsList" class="list-group mt-4"></ul>
+
+<script src="~/js/api.js"></script>
+<script>
+    function parseJwt(token) {
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch (e) {
+            return null;
+        }
+    }
+
+    let editTestId = null;
+    let currentTests = [];
+
+    (async function() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/Login';
+            return;
+        }
+
+        const payload = parseJwt(token);
+        const userId = payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+
+        if (!userId) {
+            alert("Не удалось извлечь ID пользователя из токена");
+            window.location.href = '/Login';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/Users/${userId}/profile`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                alert("Ошибка при проверке прав");
+                window.location.href = '/Login';
+                return;
+            }
+
+            const user = await response.json();
+
+            if (!user.roleTitle || user.roleTitle !== 'Admin') {
+                alert('Недостаточно прав для доступа к этой странице');
+                window.location.href = '/';
+                return;
+            }
+
+            await loadTests();
+
+        } catch (e) {
+            alert('Ошибка при проверке прав доступа');
+            window.location.href = '/Login';
+        }
+    })();
+
+    async function loadTests() {
+        try {
+            const response = await apiGet("/api/Tests?pageNumber=1&pageSize=100");
+            currentTests = response.data || [];
+            renderTests();
+        } catch (e) {
+            console.error("Ошибка загрузки тестов:", e);
+            document.getElementById("testsList").innerHTML =
+                '<li class="list-group-item text-danger">Ошибка загрузки тестов</li>';
+        }
+    }
+
+    function renderTests() {
+        const list = document.getElementById("testsList");
+        list.innerHTML = "";
+
+        if (currentTests.length === 0) {
+            list.innerHTML = "<li class='list-group-item'>Тесты не найдены</li>";
+            return;
+        }
+
+        currentTests.forEach(t => {
+            list.innerHTML += `
+                <li class="list-group-item d-flex justify-content-between align-items-center" data-test-id="${t.id}">
+                    <div>
+                        <strong>${t.title}</strong><br/>
+                        ${t.description ? t.description : ""}
+                    </div>
+                    <div>
+                        <button class="btn btn-primary btn-sm me-2 edit-btn" data-test-id="${t.id}">Редактировать</button>
+                        <button class="btn btn-danger btn-sm delete-btn" data-test-id="${t.id}">Удалить</button>
+                    </div>
+                </li>`;
+        });
+
+        document.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = parseInt(btn.dataset.testId);
+                const test = currentTests.find(t => t.id === id);
+                if (test) openEditForm(test);
+            });
+        });
+
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = parseInt(btn.dataset.testId);
+                deleteTest(id);
+            });
+        });
+    }
+
+    function openEditForm(test) {
+        editTestId = test.id;
+        document.getElementById("testTitle").value = test.title;
+        document.getElementById("testDescription").value = test.description || "";
+
+        document.getElementById("addTestBtn").textContent = "Сохранить изменения";
+        document.getElementById("addTestBtn").classList.remove("btn-success");
+        document.getElementById("addTestBtn").classList.add("btn-primary");
+        document.getElementById("cancelEditBtn").classList.remove("d-none");
+    }
+
+    function resetForm() {
+        editTestId = null;
+        document.getElementById("testTitle").value = "";
+        document.getElementById("testDescription").value = "";
+
+        document.getElementById("addTestBtn").textContent = "Добавить тест";
+        document.getElementById("addTestBtn").classList.remove("btn-primary");
+        document.getElementById("addTestBtn").classList.add("btn-success");
+        document.getElementById("cancelEditBtn").classList.add("d-none");
+    }
+
+    document.getElementById("cancelEditBtn").addEventListener("click", resetForm);
+
+    document.getElementById("addTestBtn").addEventListener("click", async () => {
+        const title = document.getElementById("testTitle").value.trim();
+        const description = document.getElementById("testDescription").value.trim();
+
+        if (!title) {
+            alert("Введите название теста");
+            return;
+        }
+
+        try {
+            const payload = {
+                id: editTestId,
+                title: title,
+                description: description || null
+            };
+
+            if (editTestId) {
+                await apiPut(`/api/Tests/${editTestId}`, payload);
+                alert("Тест успешно обновлен");
+            } else {
+                await apiPost("/api/Tests", payload);
+                alert("Тест успешно добавлен");
+            }
+
+            resetForm();
+            await loadTests();
+        } catch (e) {
+            console.error("Ошибка сохранения теста:", e);
+            alert("Ошибка при сохранении теста");
+        }
+    });
+
+    async function deleteTest(id) {
+        if (confirm("Удалить тест?")) {
+            try {
+                await apiDelete(`/api/Tests/${id}`);
+                await loadTests();
+            } catch (e) {
+                alert("Ошибка при удалении теста");
+                console.error(e);
+            }
+        }
+    }
+</script>

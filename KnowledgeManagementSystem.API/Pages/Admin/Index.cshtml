@@ -1,0 +1,104 @@
+﻿@page
+@{
+    Layout = "_Layout";
+}
+
+<div id="adminPanel">
+    <div class="text-center my-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+        <p class="mt-3">Проверка прав доступа...</p>
+    </div>
+</div>
+<script src="~/js/api.js"></script>
+<script>
+    function parseJwt(token) {
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch (e) {
+            return null;
+        }
+    }
+
+    (async function() {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/Login';
+                return;
+            }
+
+            const payload = parseJwt(token);
+            const userId = payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+
+            if (!userId) {
+                throw new Error("Не удалось извлечь ID пользователя из токена");
+            }
+
+            const response = await fetch(`/api/Users/${userId}/profile`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                throw new Error(errorData?.message || 'Ошибка при проверке прав');
+            }
+
+            const user = await response.json();
+
+            console.log('User from API:', user);
+
+            if (!user.roleTitle || user.roleTitle !== 'Admin') {
+                throw new Error('Недостаточно прав для доступа к админ-панели');
+            }
+
+
+            document.getElementById('adminPanel').innerHTML = `
+                <div class="container mt-5">
+                    <h2 class="mb-4">Админ-панель</h2>
+                    <div class="list-group">
+                        <a href="/Admin/ManageCourses" class="list-group-item list-group-item-action">
+                            <i class="bi bi-book me-2"></i>Управление курсами
+                        </a>
+                        <a href="/Admin/ManageTests" class="list-group-item list-group-item-action">
+                            <i class="bi bi-question-square me-2"></i>Управление тестами
+                        </a>
+                        <a href="/Admin/ManageQuestions" class="list-group-item list-group-item-action">
+                            <i class="bi bi-clipboard-check me-2"></i>Управление вопросами
+                        </a>
+                        <a href="/Admin/Users" class="list-group-item list-group-item-action">
+                            <i class="bi bi-people me-2"></i>Пользователи и роли
+                        </a>
+                        <a href="/Admin/ReviewResults" class="list-group-item list-group-item-action">
+                            <i class="bi bi-clipboard-check me-2"></i>Проверка результатов
+                        </a>
+                        <a href="/Admin/ManageCourseTests" class="list-group-item list-group-item-action">
+                            <i class="bi bi-clipboard-check me-2"></i>Добавить тест в курс
+                        </a>
+                        <a href="/Admin/ManageTestQuestions" class="list-group-item list-group-item-action">
+                            <i class="bi bi-clipboard-check me-2"></i>Добавить вопрос в тест
+                        </a>
+                    </div>
+                </div>
+            `;
+        } catch (err) {
+            console.error('Admin panel error:', err);
+            document.getElementById('adminPanel').innerHTML = `
+                <div class="container mt-5">
+                    <div class="alert alert-danger">
+                        <h4 class="alert-heading">Ошибка доступа</h4>
+                        <p>${err.message || 'Произошла ошибка при проверке прав доступа'}</p>
+                        <hr>
+                        <div class="d-flex gap-2">
+                            <a href="/Index" class="btn btn-secondary">На главную</a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    })();
+</script>

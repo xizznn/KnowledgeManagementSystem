@@ -1,0 +1,226 @@
+﻿@page
+@{
+    Layout = "_Layout";
+    var testId = Request.Query["id"];
+}
+
+<h2>Детали теста</h2>
+
+<div id="testDetails" class="mb-3"></div>
+
+<button id="favBtn" class="btn btn-outline-info mb-4">Загрузка...</button>
+
+<h4>Вопросы теста</h4>
+<ul id="questionsList" class="list-group mb-4"></ul>
+
+<div class="text-end">
+    <button id="completeTestBtn" class="btn btn-success">Закончить тест</button>
+</div>
+
+<script src="~/js/api.js"></script>
+<script>
+    const testId = "@testId";
+    let currentUserId = null;
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/Auth/Login';
+                return;
+            }
+
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            currentUserId = payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+
+            if (!currentUserId) {
+                throw new Error('Не удалось определить пользователя');
+            }
+
+            await loadTestDetails();
+            await loadQuestions();
+            await updateFavButton();
+
+            document.getElementById("completeTestBtn").addEventListener("click", completeTest);
+
+            const favBtn = document.getElementById("favBtn");
+            favBtn.addEventListener("click", async () => {
+                favBtn.disabled = true;
+                try {
+                    const isFav = await isTestFavorite(testId);
+                    if (isFav) {
+                        await removeTestFromFavorites(testId);
+                    } else {
+                        await addTestToFavorites(testId);
+                    }
+                    await updateFavButton();
+                } catch (error) {
+                    console.error("Ошибка обновления избранного:", error);
+                    alert("Ошибка при обновлении избранного");
+                } finally {
+                    favBtn.disabled = false;
+                }
+            });
+
+        } catch (error) {
+            console.error("Ошибка инициализации:", error);
+            document.getElementById("testDetails").innerHTML =
+                "<p class='text-danger'>Ошибка загрузки страницы</p>";
+        }
+    });
+
+    async function isTestFavorite(id) {
+        const response = await apiGet(`/api/FavoritesTests/check/${id}`);
+        return response;
+    }
+
+    async function addTestToFavorites(id) {
+        await apiPost(`/api/FavoritesTests/${id}`, {});
+    }
+
+    async function removeTestFromFavorites(id) {
+        await apiDelete(`/api/FavoritesTests/${id}`);
+    }
+
+    async function updateFavButton() {
+        const btn = document.getElementById("favBtn");
+        try {
+            btn.disabled = true;
+            const isFav = await isTestFavorite(testId);
+            btn.textContent = isFav ? "Удалить из избранного" : "Добавить в избранное";
+            btn.className = isFav ? "btn btn-warning" : "btn btn-outline-warning";
+        } catch (error) {
+            console.error("Ошибка обновления кнопки:", error);
+            btn.textContent = "Ошибка";
+            btn.className = "btn btn-outline-danger";
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function loadTestDetails() {
+        try {
+            const test = await apiGet(`/api/Tests/${testId}`);
+
+            if (!test) {
+                document.getElementById("testDetails").innerHTML =
+                    "<p class='text-danger'>Тест не найден</p>";
+                return;
+            }
+
+            document.getElementById("testDetails").innerHTML = `
+                <h3>${test.title || 'Без названия'}</h3>
+                <p>${test.description || 'Нет описания'}</p>
+                ${test.courseTitles?.length ?
+                    `<p><strong>Курсы:</strong> ${test.courseTitles.join(", ")}</p>` : ''}
+            `;
+        } catch (error) {
+            console.error("Ошибка загрузки теста:", error);
+            document.getElementById("testDetails").innerHTML =
+                "<p class='text-danger'>Ошибка загрузки данных теста</p>";
+        }
+    }
+
+    async function loadQuestions() {
+        try {
+            const questionsInTest = await apiGet(`/api/QuestionsInTests/test/${testId}`);
+            const list = document.getElementById("questionsList");
+
+            if (!questionsInTest?.length) {
+                list.innerHTML = "<li class='list-group-item'>Вопросы не найдены</li>";
+                return;
+            }
+
+            const allQuestions = await apiGet("/api/Questions");
+
+            list.innerHTML = questionsInTest.map(qt => {
+                const question = allQuestions?.find(q => q.id === qt.questionId) || qt;
+                return `
+                    <li class="list-group-item">
+                        <div class="mb-2">
+                            <strong>${question.title || 'Вопрос без названия'}</strong>
+                            <p>${question.text || ''}</p>
+                        </div>
+                        <div class="answer-section">
+                            <input type="text" class="form-control answer-input mb-2"
+                                   data-question-id="${question.id}"
+                                   placeholder="Введите ваш ответ">
+                            <button class="btn btn-primary check-answer-btn"
+                                    data-question-id="${question.id}"
+                                    data-correct-answer="${question.answer}">
+                                Проверить ответ
+                            </button>
+                            <div class="answer-result mt-2"></div>
+                        </div>
+                    </li>`;
+            }).join("");
+
+            document.querySelectorAll('.check-answer-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const questionId = this.dataset.questionId;
+                    const correctAnswer = this.dataset.correctAnswer?.toLowerCase().trim() || '';
+                    const userAnswer = document.querySelector(`.answer-input[data-question-id="${questionId}"]`)?.value?.toLowerCase().trim() || '';
+                    const resultDiv = this.nextElementSibling;
+
+                    if (!userAnswer) {
+                        resultDiv.textContent = 'Введите ответ';
+                        resultDiv.className = 'answer-result mt-2 text-warning';
+                        return;
+                    }
+
+                    const isCorrect = userAnswer === correctAnswer;
+                    resultDiv.textContent = isCorrect ? 'Правильно!' : 'Не правильно';
+                    resultDiv.className = `answer-result mt-2 text-${isCorrect ? 'success' : 'danger'}`;
+                });
+            });
+
+        } catch (error) {
+            console.error("Ошибка загрузки вопросов:", error);
+            document.getElementById("questionsList").innerHTML =
+                "<li class='list-group-item text-danger'>Ошибка загрузки вопросов</li>";
+        }
+    }
+
+    async function completeTest() {
+        const btn = document.getElementById("completeTestBtn");
+        btn.disabled = true;
+        btn.textContent = "Отправка...";
+
+        try {
+            if (!currentUserId) {
+                throw new Error('Пользователь не авторизован');
+            }
+
+            const response = await apiPost("/api/TestResults", {
+                userId: parseInt(currentUserId),
+                testId: parseInt(testId),
+                score: null
+            });
+
+            alert('Тест успешно отправлен на проверку!');
+            window.location.href = '/Tests';
+        } catch (error) {
+            console.error('Ошибка завершения теста:', error);
+            alert(`Ошибка: ${error.message}`);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "Закончить тест";
+        }
+    }
+</script>
+
+<style>
+    .answer-section {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+    }
+
+    .answer-result {
+        font-weight: bold;
+    }
+
+    .btn:disabled {
+        opacity: 0.7;
+    }
+</style>

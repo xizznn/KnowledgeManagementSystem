@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace KnowledgeManagement.Infrastructure.Configurations
 {
-    public class QuestionConfiguration : IEntityTypeConfiguration<Question>
+    public class QuestionConfiguration : IEntityTypeConfiguration<QuestionEntity>
     {
-        public void Configure(EntityTypeBuilder<Question> builder)
+        public void Configure(EntityTypeBuilder<QuestionEntity> builder)
         {
             builder.HasKey(q => q.Id);
 
